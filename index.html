@@ -208,6 +208,17 @@
 </head>
 <body>
 
+<div id="lock-screen" style="display:none; padding: 3rem 1.5rem; text-align:center;">
+  <h1 style="margin-bottom:0.5rem;">Bills</h1>
+  <p class="sub" style="margin-bottom:1.2rem;">Enter your code to continue.</p>
+  <input id="lock-input" type="text" inputmode="numeric" style="font-family:'IBM Plex Mono',monospace; font-size:1.1rem; text-align:center; padding:0.6rem; border:1px solid var(--line); border-radius:6px; width:140px; background:var(--paper-raised); color:var(--ink);">
+  <div>
+    <button id="lock-submit" class="tap-target" style="margin-top:0.9rem; padding:0.5rem 1.4rem;">Continue</button>
+  </div>
+  <p id="lock-error" style="color:var(--due); font-size:0.8rem; margin-top:0.8rem; display:none;">Wrong code. Try again.</p>
+</div>
+
+<div id="app-shell" style="display:none;">
 <header>
   <h1>Bills</h1>
   <p class="sub" id="month-label">Loading…</p>
@@ -241,6 +252,7 @@
     <div class="loading">Loading bills…</div>
   </div>
 </main>
+</div>
 
 <script>
   // ---- Set this once to your Apps Script /exec URL ----
@@ -252,6 +264,43 @@
   let currentMonth = MONTHS[new Date().getMonth()];
   let currentHalf = new Date().getDate() <= 15 ? 1 : 2;
   let allBills = [];
+
+  function getToken() {
+    return localStorage.getItem('billsToken') || '';
+  }
+
+  function showApp() {
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'block';
+    setHalf(currentHalf);
+    loadBills();
+    setInterval(() => loadBills(true), 30000);
+  }
+
+  function showLock(wrongCode) {
+    document.getElementById('app-shell').style.display = 'none';
+    document.getElementById('lock-screen').style.display = 'block';
+    document.getElementById('lock-error').style.display = wrongCode ? 'block' : 'none';
+    document.getElementById('lock-input').focus();
+  }
+
+  document.getElementById('lock-submit').addEventListener('click', submitCode);
+  document.getElementById('lock-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitCode();
+  });
+
+  function submitCode() {
+    const val = document.getElementById('lock-input').value.trim();
+    if (!val) return;
+    localStorage.setItem('billsToken', val);
+    showApp();
+  }
+
+  if (getToken()) {
+    showApp();
+  } else {
+    showLock(false);
+  }
 
   const monthSelect = document.getElementById('month-select');
   MONTHS.forEach(m => {
@@ -283,9 +332,14 @@
       document.getElementById('month-label').textContent = 'Loading…';
     }
     try {
-      const res = await fetch(`${API_URL}?month=${currentMonth}`);
+      const res = await fetch(`${API_URL}?month=${currentMonth}&token=${encodeURIComponent(getToken())}`);
       if (!res.ok) throw new Error('Request failed: ' + res.status);
       const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
       allBills = data.bills;
       document.getElementById('month-label').textContent = data.month;
       render();
@@ -300,7 +354,7 @@
   async function togglePaid(row, newlyPaid) {
     const action = newlyPaid ? 'markPaid' : 'unmark';
     try {
-      const res = await fetch(`${API_URL}?action=${action}&row=${row}`);
+      const res = await fetch(`${API_URL}?action=${action}&row=${row}&token=${encodeURIComponent(getToken())}`);
       const data = await res.json();
       if (data.ok) {
         const bill = allBills.find(b => b.row === row);
@@ -373,10 +427,6 @@
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
-
-  setHalf(currentHalf);
-  loadBills();
-  setInterval(() => loadBills(true), 30000);
 </script>
 
 </body>
