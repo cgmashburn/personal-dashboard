@@ -277,9 +277,11 @@
     render();
   }
 
-  async function loadBills() {
-    document.getElementById('bill-list').innerHTML = '<div class="loading">Loading bills…</div>';
-    document.getElementById('month-label').textContent = 'Loading…';
+  async function loadBills(isBackground) {
+    if (!isBackground) {
+      document.getElementById('bill-list').innerHTML = '<div class="loading">Loading bills…</div>';
+      document.getElementById('month-label').textContent = 'Loading…';
+    }
     try {
       const res = await fetch(`${API_URL}?month=${currentMonth}`);
       if (!res.ok) throw new Error('Request failed: ' + res.status);
@@ -288,8 +290,10 @@
       document.getElementById('month-label').textContent = data.month;
       render();
     } catch (err) {
-      document.getElementById('bill-list').innerHTML =
-        `<div class="error">Couldn't load bills. ${err.message}</div>`;
+      if (!isBackground) {
+        document.getElementById('bill-list').innerHTML =
+          `<div class="error">Couldn't load bills. ${err.message}</div>`;
+      }
     }
   }
 
@@ -372,7 +376,7 @@
 
   setHalf(currentHalf);
   loadBills();
-  setInterval(loadBills, 30000);
+  setInterval(() => loadBills(true), 30000);
 </script>
 
 </body>
