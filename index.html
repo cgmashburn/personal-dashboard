@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bills</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=IBM+Plex+Mono:wght@500&family=Inter:wght@400;500&display=swap');
+
+  :root {
+    --paper: #F5F3ED;
+    --paper-raised: #FCFBF8;
+    --ink: #22252A;
+    --ink-soft: #5B5E58;
+    --line: #D8D4C8;
+    --paid: #1F6F5C;
+    --paid-bg: #E4EFEA;
+    --due: #B9762A;
+    --due-bg: #F5E9D8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 3rem;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    padding: 1.1rem 1.25rem 0.9rem;
+    z-index: 10;
+  }
+
+  h1 {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0 0 0.15rem;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin: 0 0 0.85rem;
+  }
+
+  select {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .halves {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+
+  .half-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.45rem 0;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .half-btn.active {
+    background: var(--ink);
+    color: var(--paper-raised);
+    border-color: var(--ink);
+  }
+
+  main { padding: 1rem 1.25rem; }
+
+  .summary {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 1.4rem;
+  }
+
+  .stat {
+    flex: 1;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+  }
+
+  .stat .label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    margin-bottom: 0.25rem;
+  }
+
+  .stat .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    font-size: 1.15rem;
+  }
+
+  .section-title {
+    font-family: 'Lora', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--ink);
+  }
+
+  .section-title:first-of-type { margin-top: 0; }
+
+  .bill {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px dotted var(--line);
+    position: relative;
+  }
+
+  .bill:last-child { border-bottom: none; }
+
+  .bill-name {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bill-leader {
+    flex: 1;
+    border-bottom: 1px dotted var(--line);
+    margin-bottom: 0.3rem;
+    min-width: 0.5rem;
+  }
+
+  .bill-amount {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .bill-due {
+    font-size: 0.68rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    width: 3.1rem;
+  }
+
+  .tap-target {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+  }
+
+  .tap-target.paid {
+    background: var(--paid-bg);
+    color: var(--paid);
+    border-color: var(--paid);
+  }
+
+  .auto-tag {
+    font-size: 0.68rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    padding: 0.2rem 0;
+  }
+
+  .skip {
+    opacity: 0.4;
+  }
+
+  .loading, .error {
+    padding: 2rem 0;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  .error { color: var(--due); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bills</h1>
+  <p class="sub" id="month-label">Loading…</p>
+  <div style="display:flex; gap:0.5rem; align-items:center;">
+    <select id="month-select"></select>
+  </div>
+  <div class="halves">
+    <div class="half-btn active" id="half1-btn">1st half</div>
+    <div class="half-btn" id="half2-btn">2nd half</div>
+  </div>
+</header>
+
+<main>
+  <div class="summary">
+    <div class="stat">
+      <div class="label">Due this half</div>
+      <div class="value" id="stat-due">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Paid so far</div>
+      <div class="value" id="stat-paid">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Remaining</div>
+      <div class="value" id="stat-remaining">—</div>
+    </div>
+  </div>
+
+  <div id="bill-list">
+    <div class="loading">Loading bills…</div>
+  </div>
+</main>
+
+<script>
+  // ---- Set this once to your Apps Script /exec URL ----
+  const API_URL = 'https://script.google.com/macros/s/AKfycby0mekxXNIb8itgyTWR8PSAe8fU0jI14CP4ua3HrnQBU0oF4FMVdX0SRZQTRJ0HcOY/exec';
+
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+
+  let currentMonth = MONTHS[new Date().getMonth()];
+  let currentHalf = new Date().getDate() <= 15 ? 1 : 2;
+  let allBills = [];
+
+  const monthSelect = document.getElementById('month-select');
+  MONTHS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    if (m === currentMonth) opt.selected = true;
+    monthSelect.appendChild(opt);
+  });
+
+  monthSelect.addEventListener('change', () => {
+    currentMonth = monthSelect.value;
+    loadBills();
+  });
+
+  document.getElementById('half1-btn').addEventListener('click', () => setHalf(1));
+  document.getElementById('half2-btn').addEventListener('click', () => setHalf(2));
+
+  function setHalf(half) {
+    currentHalf = half;
+    document.getElementById('half1-btn').classList.toggle('active', half === 1);
+    document.getElementById('half2-btn').classList.toggle('active', half === 2);
+    render();
+  }
+
+  async function loadBills() {
+    document.getElementById('bill-list').innerHTML = '<div class="loading">Loading bills…</div>';
+    document.getElementById('month-label').textContent = 'Loading…';
+    try {
+      const res = await fetch(`${API_URL}?month=${currentMonth}`);
+      if (!res.ok) throw new Error('Request failed: ' + res.status);
+      const data = await res.json();
+      allBills = data.bills;
+      document.getElementById('month-label').textContent = data.month;
+      render();
+    } catch (err) {
+      document.getElementById('bill-list').innerHTML =
+        `<div class="error">Couldn't load bills. ${err.message}</div>`;
+    }
+  }
+
+  async function togglePaid(row, newlyPaid) {
+    const action = newlyPaid ? 'markPaid' : 'unmark';
+    try {
+      const res = await fetch(`${API_URL}?action=${action}&row=${row}`);
+      const data = await res.json();
+      if (data.ok) {
+        const bill = allBills.find(b => b.row === row);
+        if (bill) bill.status = data.newValue;
+        render();
+      }
+    } catch (err) {
+      alert("Couldn't update that bill. Check your connection and try again.");
+    }
+  }
+
+  function render() {
+    const bills = allBills.filter(b => b.half === currentHalf);
+    const container = document.getElementById('bill-list');
+
+    if (bills.length === 0) {
+      container.innerHTML = '<div class="loading">No bills found for this period.</div>';
+    } else {
+      const sections = {};
+      bills.forEach(b => {
+        if (!sections[b.section]) sections[b.section] = [];
+        sections[b.section].push(b);
+      });
+
+      let html = '';
+      Object.keys(sections).forEach(section => {
+        html += `<div class="section-title">${section}</div>`;
+        sections[section].forEach(b => {
+          const isSkip = b.status === '-';
+          const isPaid = b.status === 'P';
+          const amount = '$' + Math.round(b.amount).toLocaleString();
+
+          let control;
+          if (isSkip) {
+            control = '<span class="auto-tag">skipped this period</span>';
+          } else if (b.type === 'auto') {
+            control = '<span class="auto-tag">auto-pay</span>';
+          } else {
+            control = `<button class="tap-target ${isPaid ? 'paid' : ''}" data-row="${b.row}" data-paid="${isPaid ? '0' : '1'}">${isPaid ? 'Paid' : 'Mark paid'}</button>`;
+          }
+
+          html += `
+            <div class="bill ${isSkip ? 'skip' : ''}">
+              <span class="bill-due">day ${b.due}</span>
+              <span class="bill-name">${b.name}</span>
+              <span class="bill-leader"></span>
+              <span class="bill-amount">${amount}</span>
+              ${control}
+            </div>`;
+        });
+      });
+      container.innerHTML = html;
+
+      container.querySelectorAll('button[data-row]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          togglePaid(parseInt(btn.dataset.row, 10), btn.dataset.paid === '1');
+        });
+      });
+    }
+
+    const visible = bills.filter(b => b.status !== '-');
+    const due = visible.reduce((sum, b) => sum + b.amount, 0);
+    const paid = visible.filter(b => b.status === 'P' || b.type === 'auto')
+                        .reduce((sum, b) => sum + b.amount, 0);
+    const remaining = due - paid;
+
+    document.getElementById('stat-due').textContent = '$' + Math.round(due).toLocaleString();
+    document.getElementById('stat-paid').textContent = '$' + Math.round(paid).toLocaleString();
+    document.getElementById('stat-remaining').textContent = '$' + Math.round(remaining).toLocaleString();
+  }
+
+  setHalf(currentHalf);
+  loadBills();
+</script>
+
+</body>
+</html>
