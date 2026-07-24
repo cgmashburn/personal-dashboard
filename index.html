@@ -213,6 +213,7 @@
   <p class="sub" id="month-label">Loading…</p>
   <div style="display:flex; gap:0.5rem; align-items:center;">
     <select id="month-select"></select>
+    <button id="refresh-btn" class="tap-target" style="margin-left:auto;">Refresh</button>
   </div>
   <div class="halves">
     <div class="half-btn active" id="half1-btn">1st half</div>
@@ -367,8 +368,11 @@
     document.getElementById('stat-remaining').textContent = '$' + Math.round(remaining).toLocaleString();
   }
 
+  document.getElementById('refresh-btn').addEventListener('click', loadBills);
+
   setHalf(currentHalf);
   loadBills();
+  setInterval(loadBills, 30000);
 </script>
 
 </body>
