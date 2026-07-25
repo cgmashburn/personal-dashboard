@@ -389,6 +389,11 @@
   <div id="bill-list">
     <div class="loading">Loading bills…</div>
   </div>
+
+  <div class="stat" style="margin-top:1.4rem;">
+    <div class="label">Flex (this half, budgeted)</div>
+    <div class="value" id="stat-flex">—</div>
+  </div>
 </main>
 </div>
 
@@ -402,6 +407,7 @@
   let currentMonth = MONTHS[new Date().getMonth()];
   let currentHalf = new Date().getDate() <= 15 ? 1 : 2;
   let allBills = [];
+  let incomeByHalf = { 1: null, 2: null };
   let editingRow = null;
 
   async function saveEdit(row, name, amount) {
@@ -510,6 +516,7 @@
         return;
       }
       allBills = data.bills;
+      incomeByHalf = data.income || { 1: null, 2: null };
       render();
     } catch (err) {
       if (!isBackground) {
@@ -636,6 +643,15 @@
     document.getElementById('stat-due').textContent = '$' + Math.round(due).toLocaleString();
     document.getElementById('stat-paid').textContent = '$' + Math.round(paid).toLocaleString();
     document.getElementById('stat-remaining').textContent = '$' + Math.round(remaining).toLocaleString();
+
+    const income = incomeByHalf[currentHalf];
+    const flexEl = document.getElementById('stat-flex');
+    if (typeof income === 'number') {
+      const flex = income - due;
+      flexEl.textContent = '$' + Math.round(flex).toLocaleString();
+    } else {
+      flexEl.textContent = '—';
+    }
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
