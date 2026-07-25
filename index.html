@@ -213,8 +213,15 @@
     border-radius: 50%;
     display: inline-block;
     border: none;
+    outline: none;
     padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    line-height: 0;
+    -webkit-appearance: none;
+    appearance: none;
     cursor: pointer;
+    flex-shrink: 0;
   }
 
   .status-dot.due { background: #B23B3B; }
@@ -574,8 +581,8 @@
             <div class="bill">
               <span class="bill-due">${b.due}</span>
               <span class="bill-name-wrap">
-                <span class="bill-name">${b.name}</span>
                 <span class="type-marker">${b.type === 'auto' ? 'A' : 'M'}</span>
+                <span class="bill-name">${b.name}</span>
               </span>
               <span class="bill-amount">${amount}</span>
               <span class="bill-controls">
