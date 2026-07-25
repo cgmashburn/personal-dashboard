@@ -333,7 +333,6 @@
   .skip .bill-name,
   .skip .bill-amount {
     color: var(--ink-soft);
-    font-style: italic;
   }
 
   .loading, .error {
@@ -390,9 +389,15 @@
     <div class="loading">Loading bills…</div>
   </div>
 
-  <div class="stat" style="margin-top:1.4rem;">
-    <div class="label">Flex (this half, budgeted)</div>
-    <div class="value" id="stat-flex">—</div>
+  <div style="display:flex; gap:0.6rem; margin-top:1.4rem;">
+    <div class="stat">
+      <div class="label">Flex (adjusted for this month)</div>
+      <div class="value" id="stat-flex">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Flex (typical month)</div>
+      <div class="value" id="stat-flex-baseline">—</div>
+    </div>
   </div>
 </main>
 </div>
@@ -408,6 +413,7 @@
   let currentHalf = new Date().getDate() <= 15 ? 1 : 2;
   let allBills = [];
   let incomeByHalf = { 1: null, 2: null };
+  let flexBaselineByHalf = { 1: null, 2: null };
   let editingRow = null;
 
   async function saveEdit(row, name, amount) {
@@ -517,6 +523,7 @@
       }
       allBills = data.bills;
       incomeByHalf = data.income || { 1: null, 2: null };
+      flexBaselineByHalf = data.flexBaseline || { 1: null, 2: null };
       render();
     } catch (err) {
       if (!isBackground) {
@@ -652,6 +659,10 @@
     } else {
       flexEl.textContent = '—';
     }
+
+    const baseline = flexBaselineByHalf[currentHalf];
+    document.getElementById('stat-flex-baseline').textContent =
+      typeof baseline === 'number' ? '$' + Math.round(baseline).toLocaleString() : '—';
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
