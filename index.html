@@ -135,29 +135,61 @@
 
   .section-title:first-of-type { margin-top: 0; }
 
-  .bill {
-    display: flex;
-    align-items: baseline;
+  .bill-header {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr 4.2rem 4.6rem;
     gap: 0.5rem;
-    padding: 0.55rem 0;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0.15rem;
+  }
+
+  .bill-header .amount-col { text-align: right; }
+  .bill-header .status-col { text-align: right; }
+
+  .bill {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr 4.2rem 4.6rem;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0;
     border-bottom: 1px dotted var(--line);
-    position: relative;
   }
 
   .bill:last-child { border-bottom: none; }
+
+  .bill-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
 
   .bill-name {
     font-size: 0.9rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
 
-  .bill-leader {
-    flex: 1;
-    border-bottom: 1px dotted var(--line);
-    margin-bottom: 0.3rem;
-    min-width: 0.5rem;
+  .type-marker {
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    width: 1.1rem;
+    height: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .bill-amount {
@@ -165,13 +197,35 @@
     font-size: 0.9rem;
     font-weight: 500;
     white-space: nowrap;
+    text-align: right;
   }
 
+  .bill-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .status-dot {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    display: inline-block;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .status-dot.due { background: #B23B3B; }
+  .status-dot.pending { background: var(--due); }
+  .status-dot.paid { background: var(--paid); }
+  .status-dot.skipped { background: #B7B3A6; cursor: default; }
+
   .bill-due {
-    font-size: 0.68rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
     color: var(--ink-soft);
-    white-space: nowrap;
-    width: 3.1rem;
   }
 
   .tap-target {
@@ -206,6 +260,11 @@
     text-decoration: underline;
     padding: 0.25rem 0.3rem;
     font-family: 'Inter', sans-serif;
+  }
+
+  .skip-link.active {
+    color: #B7B3A6;
+    text-decoration: none;
   }
 
   .edit-btn {
@@ -290,8 +349,6 @@
 
 <div id="app-shell" style="display:none;">
 <header>
-  <h1>Bills</h1>
-  <p class="sub" id="month-label">Loading…</p>
   <div style="display:flex; gap:0.5rem; align-items:center;">
     <select id="month-select"></select>
     <button id="refresh-btn" class="tap-target" style="margin-left:auto;">Refresh</button>
@@ -431,7 +488,6 @@
   async function loadBills(isBackground) {
     if (!isBackground) {
       document.getElementById('bill-list').innerHTML = '<div class="loading">Loading bills…</div>';
-      document.getElementById('month-label').textContent = 'Loading…';
     }
     try {
       const res = await fetch(`${API_URL}?month=${currentMonth}&token=${encodeURIComponent(getToken())}`);
@@ -443,7 +499,6 @@
         return;
       }
       allBills = data.bills;
-      document.getElementById('month-label').textContent = data.month;
       render();
     } catch (err) {
       if (!isBackground) {
@@ -488,6 +543,7 @@
       let html = '';
       Object.keys(sections).forEach(section => {
         html += `<div class="section-title">${section}</div>`;
+        html += `<div class="bill-header"><span>Day</span><span>Bill</span><span class="amount-col">Amount</span><span class="status-col">Status</span></div>`;
         sections[section].forEach(b => {
           if (editingRow === b.row) {
             html += `
@@ -503,27 +559,30 @@
           const isSkip = b.status === '-';
           const amount = '$' + Math.round(b.amount).toLocaleString();
 
-          let control;
-          if (b.type === 'auto') {
-            control = '<span class="auto-tag">auto-pay</span>';
-          } else if (isSkip) {
-            control = `<span class="auto-tag">skipped</span> <button class="skip-link" data-row="${b.row}" data-value="">unskip</button>`;
-          } else {
-            const next = { '': 'P', 'P': 'x', 'x': '' }[b.status] ?? 'P';
-            const label = { '': 'Mark Paid', 'P': 'Pending', 'x': 'Posted' }[b.status] ?? 'Mark Paid';
-            const cls = b.status === 'P' ? 'pending' : (b.status === 'x' ? 'paid' : '');
-            control = `<button class="tap-target ${cls}" data-row="${b.row}" data-value="${next}">${label}</button>
-                       <button class="skip-link" data-row="${b.row}" data-value="-">skip</button>`;
-          }
+          const dotClass = isSkip ? 'skipped'
+                          : b.status === 'P' ? 'pending'
+                          : b.status === 'x' ? 'paid'
+                          : 'due';
+          const next = { '': 'P', 'P': 'x', 'x': '' }[b.status] ?? 'P';
+          const dot = isSkip
+            ? `<span class="status-dot ${dotClass}"></span>`
+            : `<button class="status-dot ${dotClass}" data-row="${b.row}" data-value="${next}"></button>`;
+
+          const skipBtn = `<button class="skip-link ${isSkip ? 'active' : ''}" data-row="${b.row}" data-value="${isSkip ? '' : '-'}">skip</button>`;
 
           html += `
-            <div class="bill ${isSkip ? 'skip' : ''}">
-              <span class="bill-due">day ${b.due}</span>
-              <span class="bill-name">${b.name}</span>
-              <span class="bill-leader"></span>
+            <div class="bill">
+              <span class="bill-due">${b.due}</span>
+              <span class="bill-name-wrap">
+                <span class="bill-name">${b.name}</span>
+                <span class="type-marker">${b.type === 'auto' ? 'A' : 'M'}</span>
+              </span>
               <span class="bill-amount">${amount}</span>
-              ${control}
-              <button class="edit-btn" data-edit="${b.row}">✎</button>
+              <span class="bill-controls">
+                ${dot}
+                ${skipBtn}
+                <button class="edit-btn" data-edit="${b.row}">✎</button>
+              </span>
             </div>`;
         });
       });
