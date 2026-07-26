@@ -223,6 +223,16 @@
     appearance: none;
     cursor: pointer;
     flex-shrink: 0;
+    position: relative;
+  }
+
+  .status-dot::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    bottom: -12px;
+    left: -5px;
+    right: -5px;
   }
 
   .status-dot.due { background: #B23B3B; }
