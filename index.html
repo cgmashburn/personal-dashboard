@@ -346,6 +346,29 @@
     font-style: italic;
   }
 
+  .detail-input-wide {
+    width: 100%;
+    text-align: left;
+  }
+
+  .skip-toggle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.35rem 0.7rem;
+    background: var(--paper);
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .skip-toggle.active {
+    background: #EDEBE3;
+    color: var(--ink);
+    border-color: #B7B3A6;
+  }
+
   .subitems {
     border-top: 1px dotted var(--line);
     padding-top: 0.5rem;
@@ -495,7 +518,6 @@
   let allBills = [];
   let incomeByHalf = { 1: null, 2: null };
   let flexBaselineByHalf = { 1: null, 2: null };
-  let editingRow = null;
   let expandedRow = null;
 
   async function saveEditName(row, name) {
@@ -685,16 +707,6 @@
         html += `<div class="section-title">${section}</div>`;
         html += `<div class="bill-header"><span>Day</span><span>Bill</span><span class="amount-col">Amount</span><span></span><span class="status-col">Status</span></div>`;
         sections[section].forEach(b => {
-          if (editingRow === b.row) {
-            html += `
-              <div class="edit-row">
-                <input class="edit-name" id="edit-name-${b.row}" type="text" value="${b.name.replace(/"/g, '&quot;')}">
-                <button class="save" data-save="${b.row}">Save</button>
-                <button data-cancel="${b.row}">Cancel</button>
-              </div>`;
-            return;
-          }
-
           const isSkip = b.status === '-';
           const amount = '$' + Math.round(b.amount).toLocaleString();
           const isExpanded = expandedRow === b.row;
@@ -708,8 +720,6 @@
             ? `<span class="status-dot ${dotClass}"></span>`
             : `<button class="status-dot ${dotClass}" data-row="${b.row}" data-value="${next}"></button>`;
 
-          const skipBtn = `<button class="skip-link ${isSkip ? 'active' : ''}" data-row="${b.row}" data-value="${isSkip ? '' : '-'}">skip</button>`;
-
           html += `
             <div class="bill ${isSkip ? 'skip' : ''}">
               <span class="bill-due">${b.due}</span>
@@ -722,8 +732,6 @@
               <span class="bill-controls">
                 <button class="expand-btn" data-expand="${b.row}">${isExpanded ? '▾' : '▸'}</button>
                 ${dot}
-                ${skipBtn}
-                <button class="edit-btn" data-edit="${b.row}">✎</button>
               </span>
             </div>`;
 
@@ -741,6 +749,12 @@
             html += `
               <div class="detail-panel">
                 <div class="detail-field">
+                  <label>Name</label>
+                  <input class="detail-input detail-input-wide" id="detail-name-${b.row}" type="text" value="${b.name.replace(/"/g, '&quot;')}">
+                </div>
+                <button class="save" data-save-name="${b.row}">Save name</button>
+
+                <div class="detail-field">
                   <label>MIN</label>
                   ${minField}
                 </div>
@@ -753,6 +767,12 @@
                   <input class="detail-input" id="detail-or-${b.row}" type="number" step="0.01" placeholder="none" value="${b.orValue === '' || b.orValue == null ? '' : b.orValue}">
                 </div>
                 <button class="save" data-save-overrides="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save overrides</button>
+
+                <div class="detail-field">
+                  <label>Skip this period</label>
+                  <button class="skip-toggle ${isSkip ? 'active' : ''}" data-row="${b.row}" data-value="${isSkip ? '' : '-'}">${isSkip ? 'Skipped — tap to unskip' : 'Skip'}</button>
+                </div>
+
                 ${subitemsHtml}
               </div>`;
           }
@@ -772,22 +792,10 @@
           render();
         });
       });
-      container.querySelectorAll('button[data-edit]').forEach(btn => {
+      container.querySelectorAll('button[data-save-name]').forEach(btn => {
         btn.addEventListener('click', () => {
-          editingRow = parseInt(btn.dataset.edit, 10);
-          render();
-        });
-      });
-      container.querySelectorAll('button[data-cancel]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          editingRow = null;
-          render();
-        });
-      });
-      container.querySelectorAll('button[data-save]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const row = parseInt(btn.dataset.save, 10);
-          const name = document.getElementById(`edit-name-${row}`).value.trim();
+          const row = parseInt(btn.dataset.saveName, 10);
+          const name = document.getElementById(`detail-name-${row}`).value.trim();
           if (!name) { alert('Name is required.'); return; }
           saveEditName(row, name);
         });
