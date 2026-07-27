@@ -293,6 +293,78 @@
     cursor: pointer;
   }
 
+  .expand-btn {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    padding: 0.4rem 0.2rem;
+    cursor: pointer;
+  }
+
+  .detail-panel {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin: 0.2rem 0 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .detail-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .detail-field label {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .detail-input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 0.3rem 0.5rem;
+    background: var(--paper);
+    color: var(--ink);
+    width: 6rem;
+    text-align: right;
+  }
+
+  .detail-readonly {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .subitems {
+    border-top: 1px dotted var(--line);
+    padding-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .subitem {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .subitem span:last-child {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
   .edit-row {
     display: flex;
     gap: 0.4rem;
@@ -424,10 +496,11 @@
   let incomeByHalf = { 1: null, 2: null };
   let flexBaselineByHalf = { 1: null, 2: null };
   let editingRow = null;
+  let expandedRow = null;
 
-  async function saveEdit(row, name, amount) {
+  async function saveEditName(row, name) {
     try {
-      const res = await fetch(`${API_URL}?action=editBill&row=${row}&name=${encodeURIComponent(name)}&amount=${encodeURIComponent(amount)}&token=${encodeURIComponent(getToken())}`);
+      const res = await fetch(`${API_URL}?action=editName&row=${row}&name=${encodeURIComponent(name)}&token=${encodeURIComponent(getToken())}`);
       const data = await res.json();
       if (data.ok === false && data.error === 'Not authorized') {
         localStorage.removeItem('billsToken');
@@ -436,8 +509,41 @@
       }
       if (data.ok) {
         const bill = allBills.find(b => b.row === row);
-        if (bill) { bill.name = data.name; bill.amount = data.amount; }
+        if (bill) bill.name = data.name;
         editingRow = null;
+        render();
+      } else {
+        alert(data.error || "Couldn't save changes.");
+      }
+    } catch (err) {
+      alert("Couldn't save changes. Check your connection and try again.");
+    }
+  }
+
+  async function saveOverrides(row, min, orValue) {
+    try {
+      const params = new URLSearchParams({
+        action: 'editOverrides',
+        row: row,
+        token: getToken()
+      });
+      if (min !== null) params.set('min', min);
+      params.set('orValue', orValue);
+
+      const res = await fetch(`${API_URL}?${params.toString()}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
+      if (data.ok) {
+        const bill = allBills.find(b => b.row === row);
+        if (bill) {
+          bill.amount = data.amount;
+          bill.min = data.min;
+          bill.orValue = data.orValue;
+        }
         render();
       } else {
         alert(data.error || "Couldn't save changes.");
@@ -583,7 +689,6 @@
             html += `
               <div class="edit-row">
                 <input class="edit-name" id="edit-name-${b.row}" type="text" value="${b.name.replace(/"/g, '&quot;')}">
-                <input class="edit-amount" id="edit-amount-${b.row}" type="number" step="0.01" value="${b.amount}">
                 <button class="save" data-save="${b.row}">Save</button>
                 <button data-cancel="${b.row}">Cancel</button>
               </div>`;
@@ -592,6 +697,7 @@
 
           const isSkip = b.status === '-';
           const amount = '$' + Math.round(b.amount).toLocaleString();
+          const isExpanded = expandedRow === b.row;
 
           const dotClass = isSkip ? 'skipped'
                           : b.status === 'P' ? 'pending'
@@ -614,11 +720,42 @@
               <span class="bill-amount">${amount}</span>
               <span></span>
               <span class="bill-controls">
+                <button class="expand-btn" data-expand="${b.row}">${isExpanded ? '▾' : '▸'}</button>
                 ${dot}
                 ${skipBtn}
                 <button class="edit-btn" data-edit="${b.row}">✎</button>
               </span>
             </div>`;
+
+          if (isExpanded) {
+            const minField = b.minIsFormula
+              ? `<span class="detail-readonly">auto-calculated${b.subitems ? ' from items below' : ''}</span>`
+              : `<input class="detail-input" id="detail-min-${b.row}" type="number" step="0.01" value="${b.min ?? ''}">`;
+
+            const subitemsHtml = b.subitems && b.subitems.length
+              ? `<div class="subitems">
+                  ${b.subitems.map(s => `<div class="subitem"><span>${s.name}</span><span>$${s.amount.toLocaleString()}</span></div>`).join('')}
+                </div>`
+              : '';
+
+            html += `
+              <div class="detail-panel">
+                <div class="detail-field">
+                  <label>MIN</label>
+                  ${minField}
+                </div>
+                <div class="detail-field">
+                  <label>+%</label>
+                  <span class="detail-readonly">${b.pct === '' || b.pct == null ? '—' : b.pct}</span>
+                </div>
+                <div class="detail-field">
+                  <label>OR (override)</label>
+                  <input class="detail-input" id="detail-or-${b.row}" type="number" step="0.01" placeholder="none" value="${b.orValue === '' || b.orValue == null ? '' : b.orValue}">
+                </div>
+                <button class="save" data-save-overrides="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save overrides</button>
+                ${subitemsHtml}
+              </div>`;
+          }
         });
       });
       container.innerHTML = html;
@@ -626,6 +763,13 @@
       container.querySelectorAll('button[data-row]').forEach(btn => {
         btn.addEventListener('click', () => {
           setStatus(parseInt(btn.dataset.row, 10), btn.dataset.value);
+        });
+      });
+      container.querySelectorAll('button[data-expand]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const row = parseInt(btn.dataset.expand, 10);
+          expandedRow = expandedRow === row ? null : row;
+          render();
         });
       });
       container.querySelectorAll('button[data-edit]').forEach(btn => {
@@ -644,9 +788,17 @@
         btn.addEventListener('click', () => {
           const row = parseInt(btn.dataset.save, 10);
           const name = document.getElementById(`edit-name-${row}`).value.trim();
-          const amount = document.getElementById(`edit-amount-${row}`).value;
-          if (!name || amount === '') { alert('Name and amount are both required.'); return; }
-          saveEdit(row, name, amount);
+          if (!name) { alert('Name is required.'); return; }
+          saveEditName(row, name);
+        });
+      });
+      container.querySelectorAll('button[data-save-overrides]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const row = parseInt(btn.dataset.saveOverrides, 10);
+          const minEditable = btn.dataset.minEditable === '1';
+          const min = minEditable ? document.getElementById(`detail-min-${row}`).value : null;
+          const orValue = document.getElementById(`detail-or-${row}`).value;
+          saveOverrides(row, min, orValue);
         });
       });
     }
