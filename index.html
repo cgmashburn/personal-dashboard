@@ -351,22 +351,28 @@
     text-align: left;
   }
 
-  .skip-toggle {
+  .skip-options {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .skip-opt {
     font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 500;
     border: 1px solid var(--line);
     border-radius: 6px;
-    padding: 0.35rem 0.7rem;
+    padding: 0.35rem 0.6rem;
     background: var(--paper);
     color: var(--ink-soft);
     cursor: pointer;
   }
 
-  .skip-toggle.active {
-    background: #EDEBE3;
-    color: var(--ink);
-    border-color: #B7B3A6;
+  .skip-opt.active {
+    background: var(--ink);
+    color: var(--paper-raised);
+    border-color: var(--ink);
   }
 
   .subitems {
@@ -672,7 +678,7 @@
 
   async function setStatus(row, newValue) {
     try {
-      const res = await fetch(`${API_URL}?action=setStatus&row=${row}&value=${encodeURIComponent(newValue)}&token=${encodeURIComponent(getToken())}`);
+      const res = await fetch(`${API_URL}?action=setStatus&row=${row}&value=${encodeURIComponent(newValue)}&month=${currentMonth}&token=${encodeURIComponent(getToken())}`);
       const data = await res.json();
       if (data.ok === false && data.error === 'Not authorized') {
         localStorage.removeItem('billsToken');
@@ -682,6 +688,28 @@
       if (data.ok) {
         const bill = allBills.find(b => b.row === row);
         if (bill) bill.status = data.newValue;
+        render();
+      }
+    } catch (err) {
+      alert("Couldn't update that bill. Check your connection and try again.");
+    }
+  }
+
+  async function setSkipMode(row, mode) {
+    try {
+      const res = await fetch(`${API_URL}?action=setSkip&row=${row}&mode=${mode}&month=${currentMonth}&token=${encodeURIComponent(getToken())}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
+      if (data.ok) {
+        const bill = allBills.find(b => b.row === row);
+        if (bill) {
+          bill.status = data.status;
+          bill.isPermanentlySkipped = data.isPermanentlySkipped;
+        }
         render();
       }
     } catch (err) {
@@ -769,8 +797,12 @@
                 <button class="save" data-save-overrides="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save overrides</button>
 
                 <div class="detail-field">
-                  <label>Skip this period</label>
-                  <button class="skip-toggle ${isSkip ? 'active' : ''}" data-row="${b.row}" data-value="${isSkip ? '' : '-'}">${isSkip ? 'Skipped — tap to unskip' : 'Skip'}</button>
+                  <label>Skip</label>
+                  <div class="skip-options">
+                    <button class="skip-opt ${!isSkip ? 'active' : ''}" data-skip-row="${b.row}" data-mode="none">Don't skip</button>
+                    <button class="skip-opt ${isSkip && !b.isPermanentlySkipped ? 'active' : ''}" data-skip-row="${b.row}" data-mode="month">This month</button>
+                    <button class="skip-opt ${b.isPermanentlySkipped ? 'active' : ''}" data-skip-row="${b.row}" data-mode="permanent">Every month</button>
+                  </div>
                 </div>
 
                 ${subitemsHtml}
@@ -790,6 +822,11 @@
           const row = parseInt(btn.dataset.expand, 10);
           expandedRow = expandedRow === row ? null : row;
           render();
+        });
+      });
+      container.querySelectorAll('button[data-skip-row]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setSkipMode(parseInt(btn.dataset.skipRow, 10), btn.dataset.mode);
         });
       });
       container.querySelectorAll('button[data-save-name]').forEach(btn => {
