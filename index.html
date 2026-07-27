@@ -526,56 +526,44 @@
   let flexBaselineByHalf = { 1: null, 2: null };
   let expandedRow = null;
 
-  async function saveEditName(row, name) {
+  async function savePanel(row, name, min, orValue) {
     try {
-      const res = await fetch(`${API_URL}?action=editName&row=${row}&name=${encodeURIComponent(name)}&token=${encodeURIComponent(getToken())}`);
-      const data = await res.json();
-      if (data.ok === false && data.error === 'Not authorized') {
+      const nameRes = await fetch(`${API_URL}?action=editName&row=${row}&name=${encodeURIComponent(name)}&token=${encodeURIComponent(getToken())}`);
+      const nameData = await nameRes.json();
+      if (nameData.ok === false && nameData.error === 'Not authorized') {
         localStorage.removeItem('billsToken');
         showLock(true);
         return;
       }
-      if (data.ok) {
-        const bill = allBills.find(b => b.row === row);
-        if (bill) bill.name = data.name;
-        editingRow = null;
-        render();
-      } else {
-        alert(data.error || "Couldn't save changes.");
+      if (!nameData.ok) {
+        alert(nameData.error || "Couldn't save the name.");
+        return;
       }
-    } catch (err) {
-      alert("Couldn't save changes. Check your connection and try again.");
-    }
-  }
 
-  async function saveOverrides(row, min, orValue) {
-    try {
-      const params = new URLSearchParams({
-        action: 'editOverrides',
-        row: row,
-        token: getToken()
-      });
+      const params = new URLSearchParams({ action: 'editOverrides', row: row, token: getToken() });
       if (min !== null) params.set('min', min);
       params.set('orValue', orValue);
 
-      const res = await fetch(`${API_URL}?${params.toString()}`);
-      const data = await res.json();
-      if (data.ok === false && data.error === 'Not authorized') {
+      const ovRes = await fetch(`${API_URL}?${params.toString()}`);
+      const ovData = await ovRes.json();
+      if (ovData.ok === false && ovData.error === 'Not authorized') {
         localStorage.removeItem('billsToken');
         showLock(true);
         return;
       }
-      if (data.ok) {
-        const bill = allBills.find(b => b.row === row);
-        if (bill) {
-          bill.amount = data.amount;
-          bill.min = data.min;
-          bill.orValue = data.orValue;
-        }
-        render();
-      } else {
-        alert(data.error || "Couldn't save changes.");
+      if (!ovData.ok) {
+        alert(ovData.error || "Couldn't save MIN/OR.");
+        return;
       }
+
+      const bill = allBills.find(b => b.row === row);
+      if (bill) {
+        bill.name = nameData.name;
+        bill.amount = ovData.amount;
+        bill.min = ovData.min;
+        bill.orValue = ovData.orValue;
+      }
+      render();
     } catch (err) {
       alert("Couldn't save changes. Check your connection and try again.");
     }
@@ -780,7 +768,6 @@
                   <label>Name</label>
                   <input class="detail-input detail-input-wide" id="detail-name-${b.row}" type="text" value="${b.name.replace(/"/g, '&quot;')}">
                 </div>
-                <button class="save" data-save-name="${b.row}">Save name</button>
 
                 <div class="detail-field">
                   <label>MIN</label>
@@ -794,7 +781,6 @@
                   <label>OR (override)</label>
                   <input class="detail-input" id="detail-or-${b.row}" type="number" step="0.01" placeholder="none" value="${b.orValue === '' || b.orValue == null ? '' : b.orValue}">
                 </div>
-                <button class="save" data-save-overrides="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save overrides</button>
 
                 <div class="detail-field">
                   <label>Skip</label>
@@ -804,6 +790,8 @@
                     <button class="skip-opt ${b.isPermanentlySkipped ? 'active' : ''}" data-skip-row="${b.row}" data-mode="permanent">Every month</button>
                   </div>
                 </div>
+
+                <button class="save" data-save-panel="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save</button>
 
                 ${subitemsHtml}
               </div>`;
@@ -829,21 +817,15 @@
           setSkipMode(parseInt(btn.dataset.skipRow, 10), btn.dataset.mode);
         });
       });
-      container.querySelectorAll('button[data-save-name]').forEach(btn => {
+      container.querySelectorAll('button[data-save-panel]').forEach(btn => {
         btn.addEventListener('click', () => {
-          const row = parseInt(btn.dataset.saveName, 10);
-          const name = document.getElementById(`detail-name-${row}`).value.trim();
-          if (!name) { alert('Name is required.'); return; }
-          saveEditName(row, name);
-        });
-      });
-      container.querySelectorAll('button[data-save-overrides]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const row = parseInt(btn.dataset.saveOverrides, 10);
+          const row = parseInt(btn.dataset.savePanel, 10);
           const minEditable = btn.dataset.minEditable === '1';
+          const name = document.getElementById(`detail-name-${row}`).value.trim();
           const min = minEditable ? document.getElementById(`detail-min-${row}`).value : null;
           const orValue = document.getElementById(`detail-or-${row}`).value;
-          saveOverrides(row, min, orValue);
+          if (!name) { alert('Name is required.'); return; }
+          savePanel(row, name, min, orValue);
         });
       });
     }
