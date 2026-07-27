@@ -364,7 +364,7 @@
     border: none;
     border-radius: 7px;
     padding: 0.65rem 1rem;
-    background: var(--paid);
+    background: var(--ink);
     color: var(--paper-raised);
     cursor: pointer;
     width: 100%;
@@ -576,6 +576,7 @@
         bill.min = ovData.min;
         bill.orValue = ovData.orValue;
       }
+      expandedRow = null;
       render();
     } catch (err) {
       alert("Couldn't save changes. Check your connection and try again.");
