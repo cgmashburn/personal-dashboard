@@ -404,8 +404,8 @@
 
   .skip-options {
     display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .save {
@@ -422,21 +422,20 @@
   }
 
   .skip-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-family: 'Inter', sans-serif;
     font-size: 0.85rem;
-    font-weight: 500;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 0.55rem 0.8rem;
-    background: var(--paper);
     color: var(--ink-soft);
     cursor: pointer;
   }
 
-  .skip-opt.active {
-    background: var(--ink);
-    color: var(--paper-raised);
-    border-color: var(--ink);
+  .skip-opt input[type="radio"] {
+    accent-color: var(--ink);
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
   }
 
   .subitems {
@@ -539,10 +538,10 @@
 
 <header>
   <div style="display:flex; gap:0.5rem; align-items:center;">
-    <select id="month-select"></select>
+    <select id="month-select" class="bills-only"></select>
     <button id="refresh-btn" class="tap-target" style="margin-left:auto;">Refresh</button>
   </div>
-  <div class="halves">
+  <div class="halves bills-only" id="halves-wrap">
     <div class="half-btn active" id="half1-btn">1st half</div>
     <div class="half-btn" id="half2-btn">2nd half</div>
   </div>
@@ -870,9 +869,9 @@
                 <div class="detail-field">
                   <label>Skip</label>
                   <div class="skip-options">
-                    <button class="skip-opt ${!isSkip ? 'active' : ''}" data-skip-row="${b.row}" data-mode="none">Don't skip</button>
-                    <button class="skip-opt ${isSkip && !b.isPermanentlySkipped ? 'active' : ''}" data-skip-row="${b.row}" data-mode="month">This month</button>
-                    <button class="skip-opt ${b.isPermanentlySkipped ? 'active' : ''}" data-skip-row="${b.row}" data-mode="permanent">Every month</button>
+                    <label class="skip-opt"><input type="radio" name="skip-${b.row}" value="none" ${!isSkip ? 'checked' : ''}> Don't skip</label>
+                    <label class="skip-opt"><input type="radio" name="skip-${b.row}" value="month" ${isSkip && !b.isPermanentlySkipped ? 'checked' : ''}> This month</label>
+                    <label class="skip-opt"><input type="radio" name="skip-${b.row}" value="permanent" ${b.isPermanentlySkipped ? 'checked' : ''}> Every month</label>
                   </div>
                 </div>
 
@@ -897,9 +896,10 @@
           render();
         });
       });
-      container.querySelectorAll('button[data-skip-row]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          setSkipMode(parseInt(btn.dataset.skipRow, 10), btn.dataset.mode);
+      container.querySelectorAll('input[type="radio"][name^="skip-"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          const row = parseInt(radio.name.split('-')[1], 10);
+          setSkipMode(row, radio.value);
         });
       });
       container.querySelectorAll('button[data-save-panel]').forEach(btn => {
@@ -1037,6 +1037,7 @@
     document.getElementById('tab-income').classList.remove('active');
     document.getElementById('bills-page').style.display = 'block';
     document.getElementById('income-page').style.display = 'none';
+    document.querySelectorAll('.bills-only').forEach(el => el.style.display = '');
   });
 
   document.getElementById('tab-income').addEventListener('click', () => {
@@ -1044,6 +1045,7 @@
     document.getElementById('tab-bills').classList.remove('active');
     document.getElementById('income-page').style.display = 'block';
     document.getElementById('bills-page').style.display = 'none';
+    document.querySelectorAll('.bills-only').forEach(el => el.style.display = 'none');
     if (!incomeLoaded) loadIncome();
   });
 </script>
