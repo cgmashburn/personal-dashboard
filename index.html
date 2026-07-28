@@ -371,6 +371,12 @@
     gap: 0.6rem;
   }
 
+  .detail-field-stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
   .detail-field label {
     font-size: 0.75rem;
     color: var(--ink-soft);
@@ -404,8 +410,9 @@
 
   .skip-options {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.9rem;
   }
 
   .save {
@@ -866,7 +873,7 @@
                   <input class="detail-input" id="detail-or-${b.row}" type="number" step="0.01" placeholder="none" value="${b.orValue === '' || b.orValue == null ? '' : b.orValue}">
                 </div>
 
-                <div class="detail-field">
+                <div class="detail-field detail-field-stacked">
                   <label>Skip</label>
                   <div class="skip-options">
                     <label class="skip-opt"><input type="radio" name="skip-${b.row}" value="none" ${!isSkip ? 'checked' : ''}> Don't skip</label>
