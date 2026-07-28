@@ -135,6 +135,17 @@
 
   .section-title:first-of-type { margin-top: 0; }
 
+  .prev-warning {
+    background: var(--due-bg);
+    color: var(--due);
+    border: 1px solid var(--due);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
   .page-tabs {
     display: flex;
     gap: 0.4rem;
@@ -561,6 +572,8 @@
 
 <main>
 <div id="bills-page">
+  <div id="prev-period-warning" class="prev-warning" style="display:none;"></div>
+
   <div class="summary">
     <div class="stat">
       <div class="label">Due this half</div>
@@ -726,6 +739,7 @@
     document.getElementById('half1-btn').classList.toggle('active', half === 1);
     document.getElementById('half2-btn').classList.toggle('active', half === 2);
     render();
+    checkPreviousPeriod();
   }
 
   async function loadBills(isBackground) {
@@ -745,11 +759,45 @@
       incomeByHalf = data.income || { 1: null, 2: null };
       flexBaselineByHalf = data.flexBaseline || { 1: null, 2: null };
       render();
+      if (!isBackground) checkPreviousPeriod();
     } catch (err) {
       if (!isBackground) {
         document.getElementById('bill-list').innerHTML =
           `<div class="error">Couldn't load bills. ${err.message}</div>`;
       }
+    }
+  }
+
+  async function checkPreviousPeriod() {
+    const banner = document.getElementById('prev-period-warning');
+    banner.style.display = 'none';
+
+    let unpaidCount = 0;
+    let label = '';
+
+    if (currentHalf === 2) {
+      // Previous period is the 1st half of this same month — already loaded
+      unpaidCount = allBills.filter(b => b.half === 1 && b.status !== '-' && b.status !== 'x').length;
+      label = `${currentMonth} 1st half`;
+    } else {
+      // Previous period is the 2nd half of the prior month — needs a fetch
+      const monthIndex = MONTHS.indexOf(currentMonth);
+      if (monthIndex === 0) return; // January has no prior month in this sheet
+      const prevMonth = MONTHS[monthIndex - 1];
+      try {
+        const res = await fetch(`${API_URL}?month=${prevMonth}&token=${encodeURIComponent(getToken())}`);
+        const data = await res.json();
+        if (!data.bills) return;
+        unpaidCount = data.bills.filter(b => b.half === 2 && b.status !== '-' && b.status !== 'x').length;
+        label = `${prevMonth} 2nd half`;
+      } catch (err) {
+        return; // fail silently — this is a nice-to-have, not core functionality
+      }
+    }
+
+    if (unpaidCount > 0) {
+      banner.textContent = `⚠ ${unpaidCount} unresolved bill${unpaidCount > 1 ? 's' : ''} from ${label}`;
+      banner.style.display = 'block';
     }
   }
 
