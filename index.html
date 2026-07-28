@@ -135,7 +135,58 @@
 
   .section-title:first-of-type { margin-top: 0; }
 
-  .bill-header {
+  .page-tabs {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.9rem 1.25rem 0;
+  }
+
+  .page-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.6rem 0;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: none;
+    background: var(--paper);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .page-tab.active {
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+
+  .income-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .income-card h3 {
+    font-family: 'Lora', serif;
+    font-size: 1.05rem;
+    margin: 0 0 0.7rem;
+  }
+
+  .income-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    border-bottom: 1px dotted var(--line);
+    font-size: 0.88rem;
+  }
+
+  .income-row:last-child { border-bottom: none; }
+
+  .income-row .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+  }
     display: grid;
     grid-template-columns: 1.5rem 2.4rem 1fr 4.2rem 1rem 3rem;
     gap: 0.5rem;
@@ -481,6 +532,11 @@
 </div>
 
 <div id="app-shell" style="display:none;">
+<div class="page-tabs">
+  <button class="page-tab active" id="tab-bills">Bills</button>
+  <button class="page-tab" id="tab-income">Income</button>
+</div>
+
 <header>
   <div style="display:flex; gap:0.5rem; align-items:center;">
     <select id="month-select"></select>
@@ -493,6 +549,7 @@
 </header>
 
 <main>
+<div id="bills-page">
   <div class="summary">
     <div class="stat">
       <div class="label">Due this half</div>
@@ -522,6 +579,13 @@
       <div class="value" id="stat-flex-baseline">—</div>
     </div>
   </div>
+</div>
+
+<div id="income-page" style="display:none;">
+  <div id="income-list">
+    <div class="loading">Loading income…</div>
+  </div>
+</div>
 </main>
 </div>
 
@@ -876,6 +940,112 @@
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
+
+  let incomeLoaded = false;
+
+  async function saveIncomeField(name, field, value) {
+    try {
+      const res = await fetch(`${API_URL}?action=editIncome&name=${encodeURIComponent(name)}&field=${field}&value=${encodeURIComponent(value)}&token=${encodeURIComponent(getToken())}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return false;
+      }
+      if (!data.ok) {
+        alert(data.error || "Couldn't save.");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      alert("Couldn't save. Check your connection and try again.");
+      return false;
+    }
+  }
+
+  const EDITABLE_INCOME_FIELDS = {
+    'Base /Year': 'baseYear',
+    'Medical /Month': 'medicalMonth',
+    'Post-Tax /Check': 'postTaxCheck'
+  };
+
+  async function loadIncome() {
+    document.getElementById('income-list').innerHTML = '<div class="loading">Loading income…</div>';
+    try {
+      const res = await fetch(`${API_URL}?action=getIncome&token=${encodeURIComponent(getToken())}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
+      if (!data.ok) {
+        document.getElementById('income-list').innerHTML = `<div class="error">${data.error || "Couldn't load income."}</div>`;
+        return;
+      }
+      const fmt = (v, isPct) => {
+        if (typeof v !== 'number') return '—';
+        return isPct ? Math.round(v * 100) + '%' : '$' + Math.round(v).toLocaleString();
+      };
+      document.getElementById('income-list').innerHTML = data.people.map(p => {
+        const isEditablePerson = EDITABLE_INCOME_FIELDS && p.name !== 'Total';
+        const rows = Object.entries(p.values).map(([label, val]) => {
+          const fieldKey = EDITABLE_INCOME_FIELDS[label];
+          if (isEditablePerson && fieldKey) {
+            const inputId = `income-${p.name}-${fieldKey}`;
+            return `
+              <div class="income-row">
+                <span>${label}</span>
+                <input class="detail-input" id="${inputId}" type="number" step="0.01" value="${typeof val === 'number' ? val : ''}">
+              </div>`;
+          }
+          return `
+            <div class="income-row">
+              <span>${label}</span>
+              <span class="val">${fmt(val, label === 'Tax %')}</span>
+            </div>`;
+        }).join('');
+
+        const saveBtn = isEditablePerson
+          ? `<button class="save" data-income-save="${p.name}" style="margin-top:0.6rem;">Save</button>`
+          : '';
+
+        return `<div class="income-card"><h3>${p.name}</h3>${rows}${saveBtn}</div>`;
+      }).join('');
+
+      document.querySelectorAll('button[data-income-save]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const name = btn.dataset.incomeSave;
+          const fields = Object.values(EDITABLE_INCOME_FIELDS);
+          for (const field of fields) {
+            const input = document.getElementById(`income-${name}-${field}`);
+            const ok = await saveIncomeField(name, field, input.value);
+            if (!ok) return;
+          }
+          loadIncome();
+        });
+      });
+
+      incomeLoaded = true;
+    } catch (err) {
+      document.getElementById('income-list').innerHTML = '<div class="error">Couldn\'t load income. Check your connection and try again.</div>';
+    }
+  }
+
+  document.getElementById('tab-bills').addEventListener('click', () => {
+    document.getElementById('tab-bills').classList.add('active');
+    document.getElementById('tab-income').classList.remove('active');
+    document.getElementById('bills-page').style.display = 'block';
+    document.getElementById('income-page').style.display = 'none';
+  });
+
+  document.getElementById('tab-income').addEventListener('click', () => {
+    document.getElementById('tab-income').classList.add('active');
+    document.getElementById('tab-bills').classList.remove('active');
+    document.getElementById('income-page').style.display = 'block';
+    document.getElementById('bills-page').style.display = 'none';
+    if (!incomeLoaded) loadIncome();
+  });
 </script>
 
 </body>
