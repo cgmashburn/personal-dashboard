@@ -603,6 +603,46 @@
       <div class="value" id="stat-flex-baseline">—</div>
     </div>
   </div>
+
+  <button class="tap-target" id="show-add-bill" style="width:100%; margin-top:1rem;">+ Add bill</button>
+
+  <div id="add-bill-form" class="detail-panel" style="display:none; margin-top:0.6rem;">
+    <div class="detail-field detail-field-stacked">
+      <label>Name</label>
+      <input class="detail-input detail-input-wide" id="new-bill-name" type="text">
+    </div>
+    <div class="detail-field">
+      <label>Amount</label>
+      <input class="detail-input" id="new-bill-amount" type="number" step="0.01">
+    </div>
+    <div class="detail-field">
+      <label>Due day</label>
+      <input class="detail-input" id="new-bill-due" type="number" min="1" max="31">
+    </div>
+    <div class="detail-field">
+      <label>Section</label>
+      <select class="detail-input" id="new-bill-section">
+        <option value="Utilities">Utilities</option>
+        <option value="Debt">Debt</option>
+        <option value="Other Bills">Other Bills</option>
+      </select>
+    </div>
+    <div class="detail-field">
+      <label>Half</label>
+      <select class="detail-input" id="new-bill-half">
+        <option value="1">1st half</option>
+        <option value="2">2nd half</option>
+      </select>
+    </div>
+    <div class="detail-field">
+      <label>Type</label>
+      <select class="detail-input" id="new-bill-type">
+        <option value="manual">Manual</option>
+        <option value="auto">Auto-pay</option>
+      </select>
+    </div>
+    <button class="save" id="save-new-bill">Add bill</button>
+  </div>
 </div>
 
 <div id="income-page" style="display:none;">
@@ -936,6 +976,7 @@
                 </div>
 
                 <button class="save" data-save-panel="${b.row}" data-min-editable="${b.minIsFormula ? '0' : '1'}">Save</button>
+                <button class="skip-link" data-delete-row="${b.row}" style="align-self:center; margin-top:0.2rem; color:#B23B3B;">Delete this bill</button>
 
                 ${subitemsHtml}
               </div>`;
@@ -960,6 +1001,11 @@
         radio.addEventListener('change', () => {
           const row = parseInt(radio.name.split('-')[1], 10);
           setSkipMode(row, radio.value);
+        });
+      });
+      container.querySelectorAll('button[data-delete-row]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          deleteBill(parseInt(btn.dataset.deleteRow, 10));
         });
       });
       container.querySelectorAll('button[data-save-panel]').forEach(btn => {
@@ -1000,6 +1046,71 @@
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
+
+  document.getElementById('show-add-bill').addEventListener('click', () => {
+    const form = document.getElementById('add-bill-form');
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  });
+
+  document.getElementById('save-new-bill').addEventListener('click', async () => {
+    const name = document.getElementById('new-bill-name').value.trim();
+    const amount = document.getElementById('new-bill-amount').value;
+    const due = document.getElementById('new-bill-due').value;
+    const section = document.getElementById('new-bill-section').value;
+    const half = document.getElementById('new-bill-half').value;
+    const type = document.getElementById('new-bill-type').value;
+
+    if (!name || amount === '' || due === '') {
+      alert('Name, amount, and due day are all required.');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        action: 'addBill', name, amount, due, section, half, type,
+        token: getToken()
+      });
+      const res = await fetch(`${API_URL}?${params.toString()}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
+      if (!data.ok) {
+        alert(data.error || "Couldn't add that bill.");
+        return;
+      }
+      document.getElementById('add-bill-form').style.display = 'none';
+      document.getElementById('new-bill-name').value = '';
+      document.getElementById('new-bill-amount').value = '';
+      document.getElementById('new-bill-due').value = '';
+      loadBills(); // full reload — row numbers shifted, cached data is now stale
+    } catch (err) {
+      alert("Couldn't add that bill. Check your connection and try again.");
+    }
+  });
+
+  async function deleteBill(row) {
+    if (!confirm('Delete this bill permanently? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`${API_URL}?action=deleteBill&row=${row}&token=${encodeURIComponent(getToken())}`);
+      const data = await res.json();
+      if (data.ok === false && data.error === 'Not authorized') {
+        localStorage.removeItem('billsToken');
+        showLock(true);
+        return;
+      }
+      if (!data.ok) {
+        alert(data.error || "Couldn't delete that bill.");
+        return;
+      }
+      expandedRow = null;
+      loadBills(); // full reload — row numbers shifted, cached data is now stale
+    } catch (err) {
+      alert("Couldn't delete that bill. Check your connection and try again.");
+    }
+  }
 
   let incomeLoaded = false;
 
