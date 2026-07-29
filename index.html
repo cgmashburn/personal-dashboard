@@ -86,11 +86,11 @@
   .half-btn {
     flex: 1;
     text-align: center;
-    padding: 0.6rem 0;
+    padding: 0.55rem 0.2rem;
     border-radius: 6px;
     border: 1px solid var(--line);
     background: var(--paper-raised);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 500;
     color: var(--ink-soft);
   }
@@ -140,6 +140,38 @@
   }
 
   .section-title:first-of-type { margin-top: 0; }
+
+  .status-bar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+  }
+
+  .status-pill .dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-pill .dot.due { background: #B23B3B; }
+  .status-pill .dot.pending { background: var(--due); }
+  .status-pill .dot.paid { background: var(--paid); }
+  .status-pill .dot.skipped { background: #B7B3A6; }
 
   .prev-warning {
     background: var(--due-bg);
@@ -573,12 +605,15 @@
   <div class="halves bills-only" id="halves-wrap">
     <div class="half-btn active" id="half1-btn">1st half</div>
     <div class="half-btn" id="half2-btn">2nd half</div>
+    <div class="half-btn" id="month-btn">Whole month</div>
   </div>
 </header>
 
 <main>
 <div id="bills-page">
   <div id="prev-period-warning" class="prev-warning" style="display:none;"></div>
+
+  <div id="status-bar" class="status-bar"></div>
 
   <div class="summary">
     <div class="stat">
@@ -779,13 +814,16 @@
 
   document.getElementById('half1-btn').addEventListener('click', () => setHalf(1));
   document.getElementById('half2-btn').addEventListener('click', () => setHalf(2));
+  document.getElementById('month-btn').addEventListener('click', () => setHalf('month'));
 
   function setHalf(half) {
     currentHalf = half;
     document.getElementById('half1-btn').classList.toggle('active', half === 1);
     document.getElementById('half2-btn').classList.toggle('active', half === 2);
+    document.getElementById('month-btn').classList.toggle('active', half === 'month');
     render();
-    checkPreviousPeriod();
+    if (half !== 'month') checkPreviousPeriod();
+    else document.getElementById('prev-period-warning').style.display = 'none';
   }
 
   async function loadBills(isBackground) {
@@ -805,7 +843,7 @@
       incomeByHalf = data.income || { 1: null, 2: null };
       flexBaselineByHalf = data.flexBaseline || { 1: null, 2: null };
       render();
-      if (!isBackground) checkPreviousPeriod();
+      if (!isBackground && currentHalf !== 'month') checkPreviousPeriod();
     } catch (err) {
       if (!isBackground) {
         document.getElementById('bill-list').innerHTML =
@@ -889,7 +927,7 @@
   }
 
   function render() {
-    const bills = allBills.filter(b => b.half === currentHalf);
+    const bills = currentHalf === 'month' ? allBills : allBills.filter(b => b.half === currentHalf);
     const container = document.getElementById('bill-list');
 
     if (bills.length === 0) {
@@ -1037,7 +1075,17 @@
     document.getElementById('stat-paid').textContent = '$' + Math.round(paid).toLocaleString();
     document.getElementById('stat-remaining').textContent = '$' + Math.round(remaining).toLocaleString();
 
-    const income = incomeByHalf[currentHalf];
+    let income, baseline;
+    if (currentHalf === 'month') {
+      const i1 = incomeByHalf[1], i2 = incomeByHalf[2];
+      income = (typeof i1 === 'number' && typeof i2 === 'number') ? i1 + i2 : null;
+      const f1 = flexBaselineByHalf[1], f2 = flexBaselineByHalf[2];
+      baseline = (typeof f1 === 'number' && typeof f2 === 'number') ? f1 + f2 : null;
+    } else {
+      income = incomeByHalf[currentHalf];
+      baseline = flexBaselineByHalf[currentHalf];
+    }
+
     const flexEl = document.getElementById('stat-flex');
     if (typeof income === 'number') {
       const flex = income - due;
@@ -1046,9 +1094,21 @@
       flexEl.textContent = '—';
     }
 
-    const baseline = flexBaselineByHalf[currentHalf];
     document.getElementById('stat-flex-baseline').textContent =
       typeof baseline === 'number' ? '$' + Math.round(baseline).toLocaleString() : '—';
+
+    // At-a-glance status bar: count bills by resolution state
+    const skippedCount = bills.filter(b => b.status === '-').length;
+    const paidCount = bills.filter(b => b.status === 'x').length;
+    const pendingCount = bills.filter(b => b.status === 'P').length;
+    const dueCount = bills.filter(b => b.status !== '-' && b.status !== 'x' && b.status !== 'P').length;
+
+    document.getElementById('status-bar').innerHTML = `
+      <div class="status-pill"><span class="dot paid"></span>${paidCount} posted</div>
+      <div class="status-pill"><span class="dot pending"></span>${pendingCount} pending</div>
+      <div class="status-pill"><span class="dot due"></span>${dueCount} unresolved</div>
+      <div class="status-pill"><span class="dot skipped"></span>${skippedCount} skipped</div>
+    `;
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
