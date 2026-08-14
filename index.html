@@ -279,6 +279,21 @@
     min-width: 0;
   }
 
+  .bill-name-lines {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.1rem;
+  }
+
+  .bill-subtitle {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .type-marker {
     flex-shrink: 0;
     font-family: 'IBM Plex Mono', monospace;
@@ -964,13 +979,20 @@
             ? `<span class="status-dot ${dotClass}"></span>`
             : `<button class="status-dot ${dotClass}" data-row="${b.row}" data-value="${next}"></button>`;
 
+          const pipeIdx = b.name.indexOf('|');
+          const mainName = pipeIdx === -1 ? b.name : b.name.slice(0, pipeIdx).trim();
+          const subtitle = pipeIdx === -1 ? '' : b.name.slice(pipeIdx + 1).trim();
+
           html += `
             <div class="bill ${isSkip ? 'skip' : ''}">
               <button class="expand-btn" data-expand="${b.row}">${isExpanded ? '▾' : '▸'}</button>
               <span class="bill-due">${b.due}</span>
               <span class="bill-name-wrap">
                 <span class="type-marker">${b.type === 'auto' ? 'A' : 'M'}</span>
-                <span class="bill-name">${b.name}</span>
+                <span class="bill-name-lines">
+                  <span class="bill-name">${mainName}</span>
+                  ${subtitle ? `<span class="bill-subtitle">${subtitle}</span>` : ''}
+                </span>
               </span>
               <span class="bill-amount">${amount}</span>
               <span></span>
