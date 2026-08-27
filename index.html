@@ -143,35 +143,17 @@
 
   .status-bar {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    height: 0.65rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--line);
     margin-bottom: 1rem;
   }
 
-  .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    background: var(--paper-raised);
-    border: 1px solid var(--line);
-    color: var(--ink-soft);
-  }
-
-  .status-pill .dot {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
+  .status-segment {
     flex-shrink: 0;
+    flex-basis: 0;
   }
-
-  .status-pill .dot.due { background: #B23B3B; }
-  .status-pill .dot.pending { background: var(--due); }
-  .status-pill .dot.paid { background: var(--paid); }
-  .status-pill .dot.skipped { background: #B7B3A6; }
 
   .prev-warning {
     background: var(--due-bg);
@@ -322,6 +304,37 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.6rem;
+  }
+
+  .status-dot-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .status-picker {
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    margin-right: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 0.4rem 0.6rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    z-index: 20;
+  }
+
+  .status-picker .status-dot {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .status-picker .status-dot.skipped {
+    cursor: pointer;
   }
 
   .status-dot {
@@ -723,6 +736,7 @@
   let incomeByHalf = { 1: null, 2: null };
   let flexBaselineByHalf = { 1: null, 2: null };
   let expandedRow = null;
+  let openPickerRow = null;
 
   async function savePanel(row, name, min, orValue) {
     try {
@@ -913,6 +927,7 @@
       if (data.ok) {
         const bill = allBills.find(b => b.row === row);
         if (bill) bill.status = data.newValue;
+        openPickerRow = null;
         render();
       }
     } catch (err) {
@@ -970,15 +985,23 @@
           const isSkip = b.status === '-';
           const amount = '$' + Math.round(b.amount).toLocaleString();
           const isExpanded = expandedRow === b.row;
+          const isPickerOpen = openPickerRow === b.row;
 
           const dotClass = isSkip ? 'skipped'
                           : b.status === 'P' ? 'pending'
                           : b.status === 'x' ? 'paid'
                           : 'due';
-          const next = { '': 'P', 'P': 'x', 'x': '' }[b.status] ?? 'P';
           const dot = isSkip
             ? `<span class="status-dot ${dotClass}"></span>`
-            : `<button class="status-dot ${dotClass}" data-row="${b.row}" data-value="${next}"></button>`;
+            : `<button class="status-dot ${dotClass}" data-picker-toggle="${b.row}"></button>`;
+
+          const picker = isPickerOpen ? `
+            <div class="status-picker">
+              <button class="status-dot due" data-row="${b.row}" data-value=""></button>
+              <button class="status-dot pending" data-row="${b.row}" data-value="P"></button>
+              <button class="status-dot paid" data-row="${b.row}" data-value="x"></button>
+              <button class="status-dot skipped" data-row="${b.row}" data-value="-"></button>
+            </div>` : '';
 
           const pipeIdx = b.name.indexOf('|');
           const mainName = pipeIdx === -1 ? b.name : b.name.slice(0, pipeIdx).trim();
@@ -998,7 +1021,10 @@
               <span class="bill-amount">${amount}</span>
               <span></span>
               <span class="bill-controls">
-                ${dot}
+                <span class="status-dot-wrap">
+                  ${dot}
+                  ${picker}
+                </span>
               </span>
             </div>`;
 
@@ -1052,6 +1078,14 @@
       });
       container.innerHTML = html;
 
+      container.querySelectorAll('button[data-picker-toggle]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const row = parseInt(btn.dataset.pickerToggle, 10);
+          openPickerRow = openPickerRow === row ? null : row;
+          render();
+        });
+      });
       container.querySelectorAll('button[data-row]').forEach(btn => {
         btn.addEventListener('click', () => {
           setStatus(parseInt(btn.dataset.row, 10), btn.dataset.value);
@@ -1127,14 +1161,21 @@
     const dueCount = bills.filter(b => b.status !== '-' && b.status !== 'x' && b.status !== 'P').length;
 
     document.getElementById('status-bar').innerHTML = `
-      <div class="status-pill"><span class="dot paid"></span>${paidCount} posted</div>
-      <div class="status-pill"><span class="dot pending"></span>${pendingCount} pending</div>
-      <div class="status-pill"><span class="dot due"></span>${dueCount} unresolved</div>
-      <div class="status-pill"><span class="dot skipped"></span>${skippedCount} skipped</div>
+      <div class="status-segment" style="flex-grow:${paidCount}; background:var(--paid);"></div>
+      <div class="status-segment" style="flex-grow:${pendingCount}; background:var(--due);"></div>
+      <div class="status-segment" style="flex-grow:${dueCount}; background:#B23B3B;"></div>
+      <div class="status-segment" style="flex-grow:${skippedCount}; background:#B7B3A6;"></div>
     `;
   }
 
   document.getElementById('refresh-btn').addEventListener('click', loadBills);
+
+  document.addEventListener('click', () => {
+    if (openPickerRow !== null) {
+      openPickerRow = null;
+      render();
+    }
+  });
 
   document.getElementById('show-add-bill').addEventListener('click', () => {
     const form = document.getElementById('add-bill-form');
