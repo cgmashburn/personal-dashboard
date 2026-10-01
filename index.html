@@ -656,6 +656,7 @@
 
 <main>
 <div id="bills-page">
+  <div id="third-check-note" class="extra-check-banner" style="display:none;"></div>
   <div id="prev-period-warning" class="prev-warning" style="display:none;"></div>
 
   <div id="status-bar" class="status-bar"></div>
@@ -974,7 +975,20 @@
     }
   }
 
+  function updateThirdCheckNote() {
+    const note = document.getElementById('third-check-note');
+    const monthIndex = MONTHS.indexOf(currentMonth);
+    const isThirdCheckMonth = getThirdPaycheckMonths().some(m => m.month === monthIndex);
+    if (isThirdCheckMonth) {
+      note.innerHTML = `💰 Chris gets a 3rd paycheck this month — treat it as extra, not part of the regular budget.`;
+      note.style.display = 'block';
+    } else {
+      note.style.display = 'none';
+    }
+  }
+
   function render() {
+    updateThirdCheckNote();
     const bills = currentHalf === 'month' ? allBills : allBills.filter(b => b.half === currentHalf);
     const container = document.getElementById('bill-list');
 
