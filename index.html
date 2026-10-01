@@ -166,6 +166,22 @@
     margin-bottom: 1rem;
   }
 
+  .extra-check-banner {
+    background: var(--paid-bg);
+    color: var(--paid);
+    border: 1px solid var(--paid);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+  }
+
+  .extra-check-banner .months {
+    font-weight: 700;
+  }
+
   .page-tabs {
     display: flex;
     gap: 0.4rem;
@@ -716,6 +732,7 @@
 </div>
 
 <div id="income-page" style="display:none;">
+  <div id="extra-check-banner" class="extra-check-banner" style="display:none;"></div>
   <div id="income-list">
     <div class="loading">Loading income…</div>
   </div>
@@ -1270,6 +1287,67 @@
     'Post-Tax /Check': 'postTaxCheck'
   };
 
+  // Chris is paid biweekly (every 14 days). This confirmed pay date anchors
+  // the cycle so we can calculate every other paycheck date forward or back.
+  // If his employer ever shifts a pay date (holiday/weekend), this anchor
+  // will need to be updated to the new confirmed date.
+  const CHRIS_PAY_ANCHOR = new Date(2026, 8, 4); // Sept 4, 2026
+
+  function getChrisPaycheckDates(windowStart, windowEnd) {
+    const msPerDay = 86400000;
+    const diffDays = Math.round((windowStart - CHRIS_PAY_ANCHOR) / msPerDay);
+    const n = Math.ceil(diffDays / 14);
+    let d = new Date(CHRIS_PAY_ANCHOR.getTime() + n * 14 * msPerDay);
+    const dates = [];
+    while (d <= windowEnd) {
+      if (d >= windowStart) dates.push(new Date(d));
+      d = new Date(d.getTime() + 14 * msPerDay);
+    }
+    return dates;
+  }
+
+  // Returns [{year, month (0-11)}] for every calendar month, in a 12-month
+  // window starting with the current month, where Chris gets 3 paychecks
+  // instead of the usual 2.
+  function getThirdPaycheckMonths() {
+    const today = new Date();
+    const windowStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const windowEnd = new Date(today.getFullYear(), today.getMonth() + 13, 0);
+    const dates = getChrisPaycheckDates(windowStart, windowEnd);
+    const counts = {};
+    dates.forEach(d => {
+      const key = d.getFullYear() + '-' + d.getMonth();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const result = [];
+    Object.entries(counts).forEach(([key, count]) => {
+      if (count === 3) {
+        const [y, m] = key.split('-').map(Number);
+        result.push({ year: y, month: m });
+      }
+    });
+    result.sort((a, b) => a.year - b.year || a.month - b.month);
+    return result;
+  }
+
+  function renderExtraCheckBanner(chrisPostTaxCheck) {
+    const banner = document.getElementById('extra-check-banner');
+    const months = getThirdPaycheckMonths();
+    if (!months.length) {
+      banner.style.display = 'none';
+      return;
+    }
+    const labels = months.map(({ year, month }) => {
+      const thisYear = new Date().getFullYear();
+      return year === thisYear ? MONTHS[month] : `${MONTHS[month]} ${year}`;
+    });
+    const amountText = typeof chrisPostTaxCheck === 'number'
+      ? ` (an extra ~$${Math.round(chrisPostTaxCheck).toLocaleString()} beyond your regular budget)`
+      : '';
+    banner.innerHTML = `3rd paycheck coming in <span class="months">${labels.join(', ')}</span>${amountText}. Your budget below is built around the 4 regular checks (Sara's 2 + Chris's usual 2) — treat this one as extra.`;
+    banner.style.display = 'block';
+  }
+
   async function loadIncome() {
     document.getElementById('income-list').innerHTML = '<div class="loading">Loading income…</div>';
     try {
@@ -1326,6 +1404,12 @@
           loadIncome();
         });
       });
+
+      const chrisPerson = data.people.find(p => p.name === 'Chris');
+      const chrisCheck = chrisPerson && typeof chrisPerson.values['Post-Tax /Check'] === 'number'
+        ? chrisPerson.values['Post-Tax /Check']
+        : null;
+      renderExtraCheckBanner(chrisCheck);
 
       incomeLoaded = true;
     } catch (err) {
