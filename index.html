@@ -753,6 +753,7 @@
   let allBills = [];
   let incomeByHalf = { 1: null, 2: null };
   let flexBaselineByHalf = { 1: null, 2: null };
+  let chrisPostTaxCheck = null;
   let expandedRow = null;
   let openPickerRow = null;
 
@@ -870,7 +871,21 @@
     document.getElementById('app-shell').style.display = 'block';
     setHalf(currentHalf);
     loadBills();
+    loadChrisPayAmount();
     setInterval(() => loadBills(true), 30000);
+  }
+
+  async function loadChrisPayAmount() {
+    try {
+      const res = await fetch(`${API_URL}?action=getIncome&token=${encodeURIComponent(getToken())}`);
+      const data = await res.json();
+      if (!data.ok) return;
+      const chrisPerson = data.people.find(p => p.name === 'Chris');
+      if (chrisPerson && typeof chrisPerson.values['Post-Tax /Check'] === 'number') {
+        chrisPostTaxCheck = chrisPerson.values['Post-Tax /Check'];
+        updateThirdCheckNote();
+      }
+    } catch (err) { /* silent — banner just omits the amount */ }
   }
 
   function showLock(wrongCode) {
@@ -1041,7 +1056,10 @@
     const monthIndex = MONTHS.indexOf(currentMonth);
     const isThirdCheckMonth = getThirdPaycheckMonths().some(m => m.month === monthIndex);
     if (isThirdCheckMonth) {
-      note.innerHTML = `💰 Chris gets a 3rd paycheck this month — treat it as extra, not part of the regular budget.`;
+      const amountText = typeof chrisPostTaxCheck === 'number'
+        ? ` (~$${Math.round(chrisPostTaxCheck).toLocaleString()})`
+        : '';
+      note.innerHTML = `💰 Chris gets a 3rd paycheck this month${amountText}.`;
       note.style.display = 'block';
     } else {
       note.style.display = 'none';
@@ -1424,6 +1442,10 @@
         ? chrisPerson.values['Post-Tax /Check']
         : null;
       renderExtraCheckBanner(chrisCheck);
+      if (chrisCheck !== null) {
+        chrisPostTaxCheck = chrisCheck;
+        updateThirdCheckNote();
+      }
 
       incomeLoaded = true;
     } catch (err) {
